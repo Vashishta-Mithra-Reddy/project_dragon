@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { useToast } from "@/hooks/use-toast"
 
 interface MealEntry {
   id: number;
@@ -12,10 +13,28 @@ interface MealEntry {
   timestamp: string;
 }
 
+async function fetchCalories(food: string): Promise<number> {
+  const response = await fetch('/api/nutrition', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query: food }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch calorie information');
+  }
+
+  const data = await response.json();
+  return data.calories;
+}
+
 export default function DietPage() {
   const [entries, setEntries] = useState<MealEntry[]>([])
   const [newFood, setNewFood] = useState('')
-  const [newCalories, setNewCalories] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
     const storedEntries = localStorage.getItem('dietEntries')
@@ -24,19 +43,34 @@ export default function DietPage() {
     }
   }, [])
 
-  const addEntry = () => {
-    if (newFood.trim() && newCalories.trim()) {
-      const newEntry = {
-        id: Date.now(),
-        food: newFood,
-        calories: parseInt(newCalories),
-        timestamp: new Date().toLocaleString()
+  const addEntry = async () => {
+    if (newFood.trim()) {
+      setIsLoading(true)
+      try {
+        const calories = await fetchCalories(newFood)
+        const newEntry = {
+          id: Date.now(),
+          food: newFood,
+          calories: calories,
+          timestamp: new Date().toLocaleString()
+        }
+        const updatedEntries = [newEntry, ...entries]
+        setEntries(updatedEntries)
+        localStorage.setItem('dietEntries', JSON.stringify(updatedEntries))
+        setNewFood('')
+        toast({
+          title: "Meal added",
+          description: `${newFood} (${calories} calories) added to your dragon's feast.`,
+        })
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch calorie information. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
       }
-      const updatedEntries = [newEntry, ...entries]
-      setEntries(updatedEntries)
-      localStorage.setItem('dietEntries', JSON.stringify(updatedEntries))
-      setNewFood('')
-      setNewCalories('')
     }
   }
 
@@ -56,15 +90,8 @@ export default function DietPage() {
             onChange={(e) => setNewFood(e.target.value)}
             className="bg-red-900/50 border-red-800 text-red-100 placeholder-red-400"
           />
-          <Input
-            type="number"
-            placeholder="Fire power"
-            value={newCalories}
-            onChange={(e) => setNewCalories(e.target.value)}
-            className="bg-red-900/50 border-red-800 text-red-100 placeholder-red-400"
-          />
-          <Button onClick={addEntry} className="bg-red-700 text-red-100 hover:bg-red-600">
-            Consume
+          <Button onClick={addEntry} className="bg-red-700 text-red-100 hover:bg-red-600" disabled={isLoading}>
+            {isLoading ? 'Adding...' : 'Consume'}
           </Button>
         </div>
         <div className="mb-4">
