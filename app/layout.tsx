@@ -14,7 +14,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Infernia",
+  title: "Dragon's Realm",
   description: "Enter the Dragon's Realm and unleash your inner warrior",
 };
 
